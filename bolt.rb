@@ -1,10 +1,9 @@
 #!/usr/bin/env ruby
 
-require 'wash'
-require 'json'
 require 'bolt/inventory'
-# TODO: should be required by bolt/config, where it's used.
+# Remove after next Bolt release.
 require 'bolt/logger'
+require 'wash'
 
 class Boltwash < Wash::Entry
   label 'bolt'
@@ -12,9 +11,7 @@ class Boltwash < Wash::Entry
   parent_of 'Group'
 
   def init(config)
-    boltdir = config['dir']
-    boltdir ||= Bolt::Boltdir.default_boltdir
-
+    boltdir = config['dir'] || Bolt::Boltdir.default_boltdir
     bolt_config = Bolt::Config.from_boltdir(boltdir)
     @inventory = Bolt::Inventory.from_config(bolt_config)
     prefetch :list
@@ -37,18 +34,20 @@ class Group < Wash::Entry
   end
 
   def list
-    # TODO: expose a way to get group names
-    group = @inventory.instance_variable_get(:@group_lookup)[@name]
-    group.nodes.keys.map { |target| Target.new(@inventory, target)}
+    targets = @inventory.get_targets(@name)
+    targets.map { |target| Target.new(target) }
   end
 end
 
 class Target < Wash::Entry
   label 'target'
+  state :connection_info
 
-  def initialize(inventory, name)
-    # TODO: get target details from inventory and save as state
-    @name = name
+  def initialize(target)
+    # Save just the target information we need as state.
+    @name = target.name
+    @partial_metadata = target.detail
+    @connection_info = target.to_h
   end
 end
 
