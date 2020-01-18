@@ -3,6 +3,8 @@
 A [Wash](https://puppetlabs.github.io/wash/) plugin for Bolt's inventory. It presents groups and
 targets in the inventory, and enables SSH access to them.
 
+It currently supports Bolt v1 and v2 inventories, but not inventory plugins.
+
 ## Installation and configuration
 
 1. `gem install boltwash`
