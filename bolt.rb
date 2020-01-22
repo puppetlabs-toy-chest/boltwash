@@ -11,7 +11,7 @@ class Boltwash < Wash::Entry
   parent_of 'Group'
 
   def init(config)
-    boltdir = config['dir'] || Bolt::Boltdir.default_boltdir
+    boltdir = config[:dir] ? Bolt::Boltdir.new(config[:dir]) : Bolt::Boltdir.default_boltdir
     bolt_config = Bolt::Config.from_boltdir(boltdir)
     @inventory = Bolt::Inventory.from_config(bolt_config)
     prefetch :list
