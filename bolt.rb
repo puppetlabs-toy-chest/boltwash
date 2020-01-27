@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 
 require 'bolt/inventory'
-# Remove after next Bolt release.
-require 'bolt/logger'
 require 'wash'
 
 class Boltwash < Wash::Entry
