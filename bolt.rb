@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'bolt/inventory'
+require 'shellwords'
 require 'wash'
 
 # For now we're going to mock out the plugin interface. It requires more setup
@@ -73,6 +74,7 @@ end
 class Target < Wash::Entry
   label 'target'
   parent_of VOLUMEFS
+  state :target
   description <<~DESC
     This is a target. You can view target configuration with the 'meta' command,
     and SSH to the target if it accepts SSH connections. If SSH works, the 'fs'
@@ -117,40 +119,38 @@ class Target < Wash::Entry
     }
   end
 
-  def known_hosts(host_key_check)
-    return nil unless host_key_check == false
-
-    # Disable host key checking by redirecting known hosts to an empty file
-    # This is future-proofing for when Wash works on Windows.
-    Gem.win_platform? ? 'NUL' : '/dev/null'
-  end
-
-  def transport_options(target)
-    {
-      host: target.host,
-      port: target.port,
-      user: target.user,
-      password: target.password,
-      identity_file: target.options['private-key'],
-      known_hosts: known_hosts(target.options['host-key-check'])
-    }
-  end
-
   def initialize(target)
     # Save just the target information we need as state.
     @name = target.name
     @partial_metadata = target.detail
-    # TODO: add WinRM
-    transport :ssh, transport_options(target) if target.protocol == 'ssh'
+    @target = target.to_h
     prefetch :list
   end
 
-  def exec(*_args)
-    raise 'non-ssh protocols are not yet implemented'
+  def exec(cmd, args, opts)
+    raise 'input on stdin not supported' if opts[:stdin]
+
+    # opts can contain 'tty', 'stdin', and 'elevate'. If tty is set, apply it
+    # to the target for this exec.
+    target_opts = @target.transform_keys {|k| k.to_s }
+    target_opts['tty'] = true if opts[:tty]
+    target = Bolt::Target.new(@target[:uri], target_opts)
+    raise 'remote transport not supported' if target.transport == 'remote'
+
+    transport = target.transport || 'ssh'
+    transport_class = Bolt::TRANSPORTS[transport.to_sym]
+    raise "unknown transport #{transport}" if transport_class.nil?
+
+    transport = transport_class.new
+    result = transport.run_command(target, Shellwords.join([cmd] + args))
+
+    $stdout.write(result['stdout'])
+    $stderr.write(result['stderr'])
+    result['exit_code']
   end
 
   def list
-    [volumefs('fs', maxdepth: 2)]
+    [volumefs('fs', maxdepth: 3)]
   end
 end
 
