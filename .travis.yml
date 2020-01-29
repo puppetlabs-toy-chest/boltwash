@@ -1,11 +1,50 @@
 language: ruby
 cache: bundler
+services:
+- docker
 env:
   global:
-  - WASH_VERSION=0.17.0
+  - WASH_VERSION=0.19.0
 before_script:
 - curl -sfL https://github.com/puppetlabs/wash/releases/download/${WASH_VERSION}/wash-${WASH_VERSION}-x86_64-unknown-linux.tgz | tar -xzC ~/bin
-# TODO: setup some targets in docker for Bolt to connect to
+- docker run -d -p 22 --name test_sshd rastasheep/ubuntu-sshd:16.04
 script:
-# TODO: create a bolt inventory file
+- PORT=$(docker port test_sshd 22 | cut -f2 -d:)
+- echo 'Building user Bolt v1 inventory'
+- mkdir -p ~/.puppetlabs/bolt
+- touch ~/.puppetlabs/bolt/bolt.yaml
+- |
+  cat << EOF > ~/.puppetlabs/bolt/inventory.yaml
+  version: 1
+  nodes:
+  - name: localhost
+    config:
+      transport: ssh
+      ssh:
+        port: ${PORT}
+        user: root
+        password: root
+  EOF
+- echo 'Validate with user Boltdir'
 - wash validate ./bolt
+- echo 'Building local Bolt v2 inventory'
+- touch bolt.yaml
+- |
+  cat << EOF > inventory.yaml
+  version: 2
+  targets:
+  - uri: localhost
+    config:
+      transport: ssh
+      ssh:
+        port: ${PORT}
+        user: root
+        password: root
+  EOF
+- echo 'Validate with local Boltdir'
+- |
+  cat << EOF > wash.yaml
+  bolt:
+    dir: $(pwd)
+  EOF
+- wash validate ./bolt --config-file wash.yaml
