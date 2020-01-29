@@ -69,6 +69,7 @@ class Group < Wash::Entry
   end
 end
 
+
 class Target < Wash::Entry
   label 'target'
   parent_of VOLUMEFS
@@ -77,6 +78,44 @@ class Target < Wash::Entry
     and SSH to the target if it accepts SSH connections. If SSH works, the 'fs'
     directory will show its filesystem.
   DESC
+  partial_metadata_schema begin
+    # Provides a merge of v1 and v2 target schemas. This makes it possible to match
+    # either while still providing useful information to Wash.
+    {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        alias: {
+          type: 'array'
+        },
+        uri: { type: 'string' },
+        config: {
+          type: 'object',
+          properties: {
+            transport: { type: 'string' },
+            ssh: { type: 'object' },
+            winrm: { type: 'object' },
+            pcp: { type: 'object' },
+            local: { type: 'object' },
+            docker: { type: 'object' },
+            remote: { type: 'object' }
+          }
+        },
+        vars: {
+          type: 'object'
+        },
+        features: {
+          type: 'array'
+        },
+        facts: {
+          type: 'object'
+        },
+        plugin_hooks: {
+          type: 'object'
+        }
+      }
+    }
+  end
 
   def known_hosts(host_key_check)
     return nil unless host_key_check == false
