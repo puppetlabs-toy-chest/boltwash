@@ -1,6 +1,6 @@
 # boltwash
 
-A [Wash](https://puppetlabs.github.io/wash/) plugin for [Bolt](https://puppetlabs.github.io/bolt/). This plugin presents a view of Bolt targets organized by groups, and allows you to navigate their filesystems (currently only with SSH).
+A [Wash](https://puppetlabs.github.io/wash/) plugin for [Bolt](https://puppetlabs.github.io/bolt/). This plugin presents a view of Bolt targets organized by groups, and allows you to navigate their filesystems
 ```
 wash . > stree bolt
 bolt
@@ -75,6 +75,5 @@ The Bolt plugin for Wash provides an accessible, interactive means of investigat
 
 ## Future improvements
 
-* WinRM support
 * Bolt inventory plugins
 * Implement the 'metadata' method to retrieve facts
