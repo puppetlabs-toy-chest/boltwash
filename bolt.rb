@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'bolt/inventory'
-require 'shellwords'
 require 'wash'
 
 # For now we're going to mock out the plugin interface. It requires more setup
@@ -39,6 +37,7 @@ class Boltwash < Wash::Entry
   DESC
 
   def init(config)
+    require 'bolt/inventory'
     boltdir = config[:dir] ? Bolt::Boltdir.new(config[:dir]) : Bolt::Boltdir.default_boltdir
     bolt_config = Bolt::Config.from_boltdir(boltdir)
     @inventory = Bolt::Inventory.from_config(bolt_config, Plugin.new)
@@ -69,7 +68,6 @@ class Group < Wash::Entry
     targets.map { |target| Target.new(target) }
   end
 end
-
 
 class Target < Wash::Entry
   label 'target'
@@ -127,26 +125,47 @@ class Target < Wash::Entry
     prefetch :list
   end
 
+  # Only implements SSH and WinRM. Docker can use the Wash Docker plugin, local
+  # is trivial, and remote is not really usable. PCP I hope to implement later.
   def exec(cmd, args, opts)
-    raise 'input on stdin not supported' if opts[:stdin]
+    # lazy-load dependencies to make the plugin as fast as possible
+    require 'bolt/target'
+    require 'logging'
+    require 'shellwords'
 
     # opts can contain 'tty', 'stdin', and 'elevate'. If tty is set, apply it
     # to the target for this exec.
-    target_opts = @target.transform_keys {|k| k.to_s }
+    target_opts = @target.transform_keys(&:to_s)
     target_opts['tty'] = true if opts[:tty]
     target = Bolt::Target.new(@target[:uri], target_opts)
-    raise 'remote transport not supported' if target.transport == 'remote'
+
+    logger = Logging.logger($stderr)
+    logger.level = :warn
+    command = Shellwords.join([cmd] + args)
 
     transport = target.transport || 'ssh'
-    transport_class = Bolt::TRANSPORTS[transport.to_sym]
-    raise "unknown transport #{transport}" if transport_class.nil?
+    case transport
+    when 'ssh'
+      require_relative 'transport_ssh.rb'
+      connection = BoltSSH.new(target, logger)
+    when 'winrm'
+      require_relative 'transport_winrm.rb'
+      connection = BoltWinRM.new(target, logger)
+    else
+      raise "#{transport} unsupported"
+    end
 
-    transport = transport_class.new
-    result = transport.run_command(target, Shellwords.join([cmd] + args))
-
-    $stdout.write(result['stdout'])
-    $stderr.write(result['stderr'])
-    result['exit_code']
+    begin
+      connection.connect
+      # Returns exit code
+      connection.execute(command, stdin: opts[:stdin])
+    ensure
+      begin
+        connection&.disconnect
+      rescue StandardError => e
+        logger.info("Failed to close connection to #{target}: #{e}")
+      end
+    end
   end
 
   def list

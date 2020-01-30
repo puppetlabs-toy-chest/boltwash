@@ -12,7 +12,8 @@ before_script:
 - docker run -d -p 22 --name test_sshd sshd
 script:
 - PORT=$(docker port test_sshd 22 | cut -f2 -d:)
-- echo 'Building user Bolt v1 inventory'
+- CWD=$(pwd)
+  # Test user Boltdir with v1 inventory
 - mkdir -p ~/.puppetlabs/bolt
 - touch ~/.puppetlabs/bolt/bolt.yaml
 - |
@@ -24,13 +25,14 @@ script:
       transport: ssh
       ssh:
         port: ${PORT}
-        user: root
-        password: root
+        user: bolt
+        sudo-password: bolt
+        run-as: root
+        private-key: ${CWD}/spec/fixtures/keys/id_rsa
         host-key-check: false
   EOF
-- echo 'Validate with user Boltdir'
 - wash validate ./bolt
-- echo 'Building local Bolt v2 inventory'
+  # Test local Boltdir with v2 inventory
 - touch bolt.yaml
 - |
   cat << EOF > inventory.yaml
@@ -45,8 +47,6 @@ script:
         password: root
         host-key-check: false
   EOF
-- echo 'Validate with local Boltdir'
-- CWD=$(pwd)
 - |
   cat << EOF > wash.yaml
   external-plugins:
