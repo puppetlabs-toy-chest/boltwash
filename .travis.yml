@@ -7,7 +7,9 @@ env:
   - WASH_VERSION=0.19.0
 before_script:
 - curl -sfL https://github.com/puppetlabs/wash/releases/download/${WASH_VERSION}/wash-${WASH_VERSION}-x86_64-unknown-linux.tgz | tar -xzC ~/bin
-- docker run -d -p 22 --name test_sshd rastasheep/ubuntu-sshd:16.04
+# Run a custom Dockerfile with locale and several users for testing
+- docker build spec -t sshd
+- docker run -d -p 22 --name test_sshd sshd
 script:
 - PORT=$(docker port test_sshd 22 | cut -f2 -d:)
 - echo 'Building user Bolt v1 inventory'
