@@ -44,9 +44,12 @@ script:
         host-key-check: false
   EOF
 - echo 'Validate with local Boltdir'
+- CWD=$(pwd)
 - |
   cat << EOF > wash.yaml
+  external-plugins:
+  - script: ${CWD}/bolt
   bolt:
-    dir: $(pwd)
+    dir: ${CWD}
   EOF
-- wash validate ./bolt --config-file wash.yaml
+- wash validate bolt --config-file wash.yaml
