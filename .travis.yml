@@ -55,3 +55,13 @@ script:
     dir: ${CWD}
   EOF
 - wash validate bolt --config-file wash.yaml
+  # Test Docker transport
+- |
+  cat << EOF > inventory.yaml
+  version: 2
+  targets:
+  - uri: test_sshd
+    config:
+      transport: docker
+  EOF
+- wash validate bolt --config-file wash.yaml

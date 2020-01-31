@@ -125,8 +125,8 @@ class Target < Wash::Entry
     prefetch :list
   end
 
-  # Only implements SSH and WinRM. Docker can use the Wash Docker plugin, local
-  # is trivial, and remote is not really usable. PCP I hope to implement later.
+  # Only implements SSH, WinRM, and Docker. Local is trivial, and remote is not
+  # really usable. PCP I hope to implement later.
   def exec(cmd, args, opts)
     # lazy-load dependencies to make the plugin as fast as possible
     require 'bolt/target'
@@ -151,6 +151,9 @@ class Target < Wash::Entry
     when 'winrm'
       require_relative 'transport_winrm.rb'
       connection = BoltWinRM.new(target, logger)
+    when 'docker'
+      require_relative 'transport_docker.rb'
+      connection = BoltDocker.new(target)
     else
       raise "#{transport} unsupported"
     end
