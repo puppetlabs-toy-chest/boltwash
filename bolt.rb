@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'bolt/inventory'
 require 'wash'
 
 # For now we're going to mock out the plugin interface. It requires more setup
@@ -38,6 +37,7 @@ class Boltwash < Wash::Entry
   DESC
 
   def init(config)
+    require 'bolt/inventory'
     boltdir = config[:dir] ? Bolt::Boltdir.new(config[:dir]) : Bolt::Boltdir.default_boltdir
     bolt_config = Bolt::Config.from_boltdir(boltdir)
     @inventory = Bolt::Inventory.from_config(bolt_config, Plugin.new)
@@ -69,10 +69,10 @@ class Group < Wash::Entry
   end
 end
 
-
 class Target < Wash::Entry
   label 'target'
   parent_of VOLUMEFS
+  state :target
   description <<~DESC
     This is a target. You can view target configuration with the 'meta' command,
     and SSH to the target if it accepts SSH connections. If SSH works, the 'fs'
@@ -117,36 +117,58 @@ class Target < Wash::Entry
     }
   end
 
-  def known_hosts(host_key_check)
-    return nil unless host_key_check == false
-
-    # Disable host key checking by redirecting known hosts to an empty file
-    # This is future-proofing for when Wash works on Windows.
-    Gem.win_platform? ? 'NUL' : '/dev/null'
-  end
-
-  def transport_options(target)
-    {
-      host: target.host,
-      port: target.port,
-      user: target.user,
-      password: target.password,
-      identity_file: target.options['private-key'],
-      known_hosts: known_hosts(target.options['host-key-check'])
-    }
-  end
-
   def initialize(target)
     # Save just the target information we need as state.
     @name = target.name
     @partial_metadata = target.detail
-    # TODO: add WinRM
-    transport :ssh, transport_options(target) if target.protocol == 'ssh'
+    @target = target.to_h
     prefetch :list
   end
 
-  def exec(*_args)
-    raise 'non-ssh protocols are not yet implemented'
+  # Only implements SSH, WinRM, and Docker. Local is trivial, and remote is not
+  # really usable. PCP I hope to implement later.
+  def exec(cmd, args, opts)
+    # lazy-load dependencies to make the plugin as fast as possible
+    require 'bolt/target'
+    require 'logging'
+    require 'shellwords'
+
+    # opts can contain 'tty', 'stdin', and 'elevate'. If tty is set, apply it
+    # to the target for this exec.
+    target_opts = @target.transform_keys(&:to_s)
+    target_opts['tty'] = true if opts[:tty]
+    target = Bolt::Target.new(@target[:uri], target_opts)
+
+    logger = Logging.logger($stderr)
+    logger.level = :warn
+    command = Shellwords.join([cmd] + args)
+
+    transport = target.transport || 'ssh'
+    case transport
+    when 'ssh'
+      require_relative 'transport_ssh.rb'
+      connection = BoltSSH.new(target, logger)
+    when 'winrm'
+      require_relative 'transport_winrm.rb'
+      connection = BoltWinRM.new(target, logger)
+    when 'docker'
+      require_relative 'transport_docker.rb'
+      connection = BoltDocker.new(target)
+    else
+      raise "#{transport} unsupported"
+    end
+
+    begin
+      connection.connect
+      # Returns exit code
+      connection.execute(command, stdin: opts[:stdin])
+    ensure
+      begin
+        connection&.disconnect
+      rescue StandardError => e
+        logger.info("Failed to close connection to #{target}: #{e}")
+      end
+    end
   end
 
   def list
