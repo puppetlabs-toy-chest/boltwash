@@ -69,10 +69,25 @@ class Group < Wash::Entry
   end
 end
 
+def getshell(target)
+  # Bolt's inventory defines a shell as a feature. Some transports provide
+  # default features as well. Use these to determine the login shell.
+  if target.features.include?('powershell')
+    'powershell'
+  elsif target.features.include?('bash')
+    'posixshell'
+  elsif target.transport == 'winrm'
+    'powershell'
+  elsif target.transport == 'ssh' || target.transport.nil?
+    'posixshell'
+  end
+end
+
 class Target < Wash::Entry
   label 'target'
   parent_of VOLUMEFS
   state :target
+  attributes :loginshell
   description <<~DESC
     This is a target. You can view target configuration with the 'meta' command,
     and SSH to the target if it accepts SSH connections. If SSH works, the 'fs'
@@ -122,6 +137,7 @@ class Target < Wash::Entry
     @name = target.name
     @partial_metadata = target.detail
     @target = target.to_h
+    @loginshell = getshell(target)
     prefetch :list
   end
 
