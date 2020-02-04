@@ -131,7 +131,6 @@ class Target < Wash::Entry
     # lazy-load dependencies to make the plugin as fast as possible
     require 'bolt/target'
     require 'logging'
-    require 'shellwords'
 
     # opts can contain 'tty', 'stdin', and 'elevate'. If tty is set, apply it
     # to the target for this exec.
@@ -141,7 +140,6 @@ class Target < Wash::Entry
 
     logger = Logging.logger($stderr)
     logger.level = :warn
-    command = Shellwords.join([cmd] + args)
 
     transport = target.transport || 'ssh'
     case transport
@@ -161,7 +159,7 @@ class Target < Wash::Entry
     begin
       connection.connect
       # Returns exit code
-      connection.execute(command, stdin: opts[:stdin])
+      connection.execute(cmd, args, stdin: opts[:stdin])
     ensure
       begin
         connection&.disconnect

@@ -73,6 +73,13 @@ The Bolt plugin for Wash provides an accessible, interactive means of investigat
 
 > If you're a developer, you can use the bolt plugin from source with `bundle install` and set `script: /path/to/boltwash/bolt`.
 
+## Quirks
+
+When sending complex commands over WinRM, you can pass the command as a single string with appropriate escaping, as in
+```
+wash bolt/win > wexec target 'Get-Process | Where StartTime -gt $([DateTime]::Today)'
+```
+
 ## Future improvements
 
 * Bolt inventory plugins

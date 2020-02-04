@@ -1,25 +1,25 @@
 require 'bolt/transport/base'
 require 'bolt/transport/docker/connection'
 require 'open3'
+require 'shellwords'
 
 class BoltDocker < Bolt::Transport::Docker::Connection
   attr_reader :target
 
   # Adapted from Bolt::Transport::Docker::Connection.execute.
-  def execute(command, stdin: nil)
-    if target.options['shell-command'] && !target.options['shell-command'].empty?
-      # escape any double quotes in command
-      command = command.gsub('"', '\"')
-      command = "#{target.options['shell-command']} \" #{command}\""
-    end
-    command = *Shellwords.split(command)
-
+  def execute(cmd, args, stdin: nil)
     command_options = []
     # Need to be interactive if redirecting STDIN
     command_options << '--interactive' unless stdin.nil?
     command_options << '--tty' if target.options['tty']
     command_options << container_id
-    command_options.concat(command)
+    command = Shellwords.join([cmd] + args)
+    if target.options['shell-command'] && !target.options['shell-command'].empty?
+      # escape any double quotes in command
+      command = command.gsub('"', '\"')
+      command = "#{target.options['shell-command']} \" #{command}\""
+    end
+    command_options.concat(Shellwords.split(command))
 
     env_hash = {}
     # Set the DOCKER_HOST if we are using a non-default service-url

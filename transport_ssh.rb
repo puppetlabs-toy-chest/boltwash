@@ -1,13 +1,15 @@
 require 'bolt/transport/base'
 require 'bolt/transport/sudoable'
 require 'bolt/transport/ssh/connection'
+require 'shellwords'
 
 class BoltSSH < Bolt::Transport::SSH::Connection
   # Adapted from Bolt::Transport::SSH::Connection.execute with output copied to
   # $stdout/$stderr. Returns an exit code instead of Bolt::Result. It also
   # handles stdin differently with sudo; it waits for some response, then
   # sends stdin.
-  def execute(command, stdin: nil)
+  def execute(cmd, args, stdin: nil)
+    command = Shellwords.join([cmd] + args)
     raise 'stdin not supported while using tty' if stdin && target.options['tty']
 
     # If not nil, stdin==STDIN. Read all input so we have a string to pass around.
