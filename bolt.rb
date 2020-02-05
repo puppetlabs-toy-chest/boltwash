@@ -69,10 +69,25 @@ class Group < Wash::Entry
   end
 end
 
+def get_login_shell(target)
+  # Bolt's inventory defines a shell as a feature. Some transports provide
+  # default features as well. Use these to determine the login shell.
+  if target.features.include?('powershell')
+    'powershell'
+  elsif target.features.include?('bash')
+    'posixshell'
+  elsif target.transport == 'winrm'
+    'powershell'
+  elsif target.transport == 'ssh' || target.transport.nil?
+    'posixshell'
+  end
+end
+
 class Target < Wash::Entry
   label 'target'
   parent_of VOLUMEFS
   state :target
+  attributes :os
   description <<~DESC
     This is a target. You can view target configuration with the 'meta' command,
     and SSH to the target if it accepts SSH connections. If SSH works, the 'fs'
@@ -122,6 +137,9 @@ class Target < Wash::Entry
     @name = target.name
     @partial_metadata = target.detail
     @target = target.to_h
+    if (shell = get_login_shell(target))
+      @os = { login_shell: shell }
+    end
     prefetch :list
   end
 
@@ -131,7 +149,6 @@ class Target < Wash::Entry
     # lazy-load dependencies to make the plugin as fast as possible
     require 'bolt/target'
     require 'logging'
-    require 'shellwords'
 
     # opts can contain 'tty', 'stdin', and 'elevate'. If tty is set, apply it
     # to the target for this exec.
@@ -141,7 +158,6 @@ class Target < Wash::Entry
 
     logger = Logging.logger($stderr)
     logger.level = :warn
-    command = Shellwords.join([cmd] + args)
 
     transport = target.transport || 'ssh'
     case transport
@@ -161,7 +177,7 @@ class Target < Wash::Entry
     begin
       connection.connect
       # Returns exit code
-      connection.execute(command, stdin: opts[:stdin])
+      connection.execute(cmd, args, stdin: opts[:stdin])
     ensure
       begin
         connection&.disconnect
