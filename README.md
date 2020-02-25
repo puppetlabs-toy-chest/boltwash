@@ -57,9 +57,10 @@ The Bolt plugin for Wash provides an accessible, interactive means of investigat
 
 ## Installation and configuration
 
+1. Install [Wash](https://puppetlabs.github.io/wash/getting_started)
 1. `gem install boltwash`
-2. Get the path to the boltwash script with `gem contents boltwash`.
-3. Add to `~/.puppetlabs/wash/wash.yaml`
+1. Get the path to the boltwash script with `gem contents boltwash`.
+1. Add to `~/.puppetlabs/wash/wash.yaml`
 
     ```yaml
     external-plugins:
@@ -69,7 +70,8 @@ The Bolt plugin for Wash provides an accessible, interactive means of investigat
     #bolt:
     #  dir: /path/to/boltdir
     ```
-4. Enjoy!
+1. Start Wash with `wash` (or restart it if it's already running)
+1. Enjoy!
 
 > If you're a developer, you can use the bolt plugin from source with `bundle install` and set `script: /path/to/boltwash/bolt`.
 
