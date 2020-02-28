@@ -83,10 +83,16 @@ def get_login_shell(target)
   end
 end
 
+def deep_transform_keys(hsh, &block)
+  hsh.each_with_object({}) do |(key, value), result|
+    result[yield(key)] = value.is_a?(Hash) ? deep_transform_keys(value, &block) : value
+  end
+end
+
 class Target < Wash::Entry
   label 'target'
   parent_of VOLUMEFS
-  state :target
+  state :target, :config
   attributes :os
   description <<~DESC
     This is a target. You can view target configuration with the 'meta' command,
@@ -137,30 +143,39 @@ class Target < Wash::Entry
     @name = target.name
     @partial_metadata = target.detail
     @target = target.to_h
+    @config = target.inventory.config.transport_data_get
     if (shell = get_login_shell(target))
       @os = { login_shell: shell }
     end
     prefetch :list
   end
 
+
   # Only implements SSH, WinRM, and Docker. Local is trivial, and remote is not
   # really usable. PCP I hope to implement later.
   def exec(cmd, args, opts)
     # lazy-load dependencies to make the plugin as fast as possible
-    require 'bolt/target'
+    require 'bolt/apply_target'
+    require 'bolt/util'
     require 'logging'
 
     # opts can contain 'tty', 'stdin', and 'elevate'. If tty is set, apply it
     # to the target for this exec.
-    target_opts = @target.transform_keys(&:to_s)
+    target_opts = deep_transform_keys(@target, &:to_s)
     target_opts['tty'] = true if opts[:tty]
-    target = Bolt::Target.new(@target[:uri], target_opts)
+    config = deep_transform_keys(@config, &:to_s)
+    target = Class.new(Bolt::ApplyTarget) do
+      attr_reader(:options)
+      def initialize(target_hash, config)
+        super(target_hash, config)
+        @options = target_hash
+      end
+    end.new(target_opts, config)
 
     logger = Logging.logger($stderr)
     logger.level = :warn
 
-    transport = target.transport || 'ssh'
-    case transport
+    case (transport = target.protocol)
     when 'ssh'
       require_relative 'transport_ssh.rb'
       connection = BoltSSH.new(target, logger)
