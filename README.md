@@ -89,10 +89,6 @@ When sending complex commands over WinRM, you can pass the command as a single s
 wash bolt/win > wexec target 'Get-Process | Where StartTime -gt $([DateTime]::Today)'
 ```
 
-## Known Issues
-
-Due to [727](https://github.com/puppetlabs/wash/issues/727), something like `find bolt/all/target` will not properly recurse into targets' `fs` directory. Unfortunately, this issue won't be fixed until 2/26/2019. As a temporary workaround, if you're trying to find files on a given target, you should explicitly specify the `fs` entry in the start path. For example, instead of `find bolt/all/target`, you'd write `find bolt/all/target/fs`.
-
 ## Future improvements
 
 * Bolt inventory plugins
